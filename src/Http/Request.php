@@ -1,9 +1,9 @@
 <?php
 /**
  * Kerisy Framework
- *
+ * 
  * PHP Version 7
- *
+ * 
  * @author          Jiaqing Zou <zoujiaqing@gmail.com>
  * @copyright      (c) 2015 putao.com, Inc.
  * @package         kerisy/framework
@@ -14,7 +14,8 @@
 
 namespace Kerisy\Http;
 
-use Kerisy\Contracts\Auth\Authenticatable;
+use Kerisy;
+use Kerisy\Auth\Authenticatable;
 use Kerisy\Core\MiddlewareTrait;
 use Kerisy\Core\NotSupportedException;
 use Kerisy\Core\Object;
@@ -23,11 +24,10 @@ use Kerisy\Core\ShouldBeRefreshed;
 /**
  * Class Request
  *
- * @property ParamBag $params The collection of query parameters
  * @property HeaderBag $headers The collection of request headers
+ * @property CookieBag $cookies The collection of request cookies
+ * @property ParamBag $params The collection of query parameters
  * @property HeaderBag $body The collection of request body
- *
- * @property \Kerisy\Session\Session $session The session associated to the request
  *
  * @package Kerisy\Http
  */
@@ -55,6 +55,12 @@ class Request extends Object implements ShouldBeRefreshed
      */
     public $content;
 
+    /**
+     * The upload files
+     * @var array
+     */
+    public $files;
+
     public $queryString = '';
 
     public $method = 'GET';
@@ -62,10 +68,6 @@ class Request extends Object implements ShouldBeRefreshed
     public $host = 'localhost';
 
     public $port = 8080;
-
-    public $files = [];
-    
-    public $abort = false;
 
     /**
      * The key of a header field that stores the session id, or a callable that will returns the session id.
@@ -79,14 +81,16 @@ class Request extends Object implements ShouldBeRefreshed
      */
     public $sessionKey = 'X-Session-Id';
 
+    public $sessionId = '';
+
     private $_params;
 
     private $_body;
 
     private $_headers;
-    
-    private $_route;
-    
+
+    private $_cookies;
+
     public function method()
     {
         return $this->method;
@@ -123,23 +127,9 @@ class Request extends Object implements ShouldBeRefreshed
     {
         return 'HTTPS' === explode('/', $this->protocol)[0];
     }
-    
-    public function setRoute(\Kerisy\Core\Route $route)
-    {
-        $this->setParams($route->getParams());
-        $this->_route = $route;
-    }
-    
-    public function getRoute()
-    {
-        return $this->_route;
-    }
 
     public function setParams($params = [])
     {
-        if (empty($params)) {
-            return;
-        }
         if (!$params instanceof ParamBag) {
             $params = new ParamBag($params);
         }
@@ -177,6 +167,24 @@ class Request extends Object implements ShouldBeRefreshed
         }
 
         return $this->_headers;
+    }
+
+    public function setCookies($cookies = [])
+    {
+        if (!$cookies instanceof CookieBag) {
+            $cookies = new CookieBag($cookies);
+        }
+
+        $this->_cookies = $cookies;
+    }
+
+    public function getCookies()
+    {
+        if ($this->_cookies === null) {
+            $this->_cookies = new CookieBag();
+        }
+
+        return $this->_cookies;
     }
 
     public function getBody()
@@ -218,7 +226,7 @@ class Request extends Object implements ShouldBeRefreshed
 
         if ((!$secure && $port == 80) || ($secure && $port == 443)) {
             return $host;
-        } else {
+        }else {
             return $host . ':' . $port;
         }
     }
@@ -291,14 +299,10 @@ class Request extends Object implements ShouldBeRefreshed
         $contentType = $this->getContentType();
         if ($contentType == 'application/json') {
             $parsedBody = json_decode($body, true);
+        } else if ($contentType == 'application/x-www-form-urlencoded') {
+            parse_str($body, $parsedBody);
         } else {
-            if ($contentType == 'application/x-www-form-urlencoded') {
-                parse_str($body, $parsedBody);
-            } elseif ($contentType == 'multipart/form-data') {
-                // TODO
-            } else {
-                throw new NotSupportedException("The content type: '$contentType' does not supported");
-            }
+            throw new NotSupportedException("The content type: '$contentType' does not supported");
         }
 
         return $parsedBody;
@@ -328,23 +332,11 @@ class Request extends Object implements ShouldBeRefreshed
             return $value;
         }
 
-        if (($value = $this->body->get($key)) !== null) {
+        if (($value == $this->body->get($key)) !== null) {
             return $value;
         }
 
         return $default;
-    }
-
-    /**
-     * get a $_GET value by key
-     *
-     * @param $_GET key
-     * @param string $default
-     * @return $_GET value
-     */
-    public function get($key, $default = null)
-    {
-        return $this->params->get($key, $default);
     }
 
     public function all()
@@ -359,73 +351,98 @@ class Request extends Object implements ShouldBeRefreshed
         return array_replace_recursive($this->params->only($keys), $this->body->only($keys));
     }
 
-
-    private $_session = false;
-
     /**
-     * Sets the session of the request.
-     *
-     * @param $session
-     */
-    public function setSession($session)
-    {
-        $this->_session = $session;
-    }
-
-    /**
-     * Returns the current session associated to the request.
-     *
-     * @return \Kerisy\session\Session|null
-     */
-    public function getSession()
-    {
-        if ($this->_session === false) {
-            $sessionId = is_callable($this->sessionKey) ?
-                call_user_func($this->sessionKey, $this) : $this->headers->first($this->sessionKey);
-            if ($session = session()->get($sessionId)) {
-                $this->_session = $session;
-            } else {
-                $this->_session = null;
-            }
-        }
-
-        return $this->_session;
-    }
-
-    private $_user = false;
-
-    /**
-     * Gets or sets the authenticated user for this request.
-     *
-     * @param Authenticatable $user
-     * @return \Kerisy\auth\Authenticatable|null
-     */
-    public function user(Authenticatable $user = null)
-    {
-        if ($user !== null) {
-            $this->_user = $user;
-            return;
-        }
-
-        if ($this->_user === false) {
-
-            if (($session = $this->getSession()) && $session->id) {
-                $this->_user = auth()->who($session->id);
-            } else {
-                $this->_user = null;
-            }
-        }
-
-        return $this->_user;
-    }
-
-    /**
-     * Returns the whether the request is a guest request.
-     *
+     * 重置或者初始化SessionId,并且返回是否需要设置cookie
+     * @param null $sessionId
      * @return bool
      */
-    public function guest()
+    public function initSessionId($sessionId = null)
     {
-        return $this->user() === null;
+        $setCookieSessionId = true;
+
+        if ($sessionId) {//重置SessionId
+            $this->sessionId = $sessionId;
+            //TODO
+        }
+
+        $this->sessionId = $this->cookies->get($this->sessionKey);
+        if (!$this->sessionId) {
+            $session = Kerisy::$app->session->put(['time' => time()]);
+            $this->sessionId = $session->id;
+        } else {
+
+            $setCookieSessionId = false;
+        }
+
+        return $setCookieSessionId;
     }
+
+//    private $_session = false;
+//
+//    /**
+//     * Sets the session of the request.
+//     *
+//     * @param $session
+//     */
+//    public function setSession($session)
+//    {
+//        $this->_session = $session;
+//    }
+//
+//    /**
+//     * Returns the current session associated to the request.
+//     *
+//     * @return \Kerisy\session\Session|null
+//     */
+//    public function getSession()
+//    {
+//        if ($this->_session === false) {
+//            $sessionId = is_callable($this->sessionKey) ?
+//                call_user_func($this->sessionKey, $this) : $this->headers->first($this->sessionKey);
+//            if ($session = Kerisy::$app->session->get($sessionId)) {
+//                $this->_session = $session;
+//            } else {
+//                $this->_session = null;
+//            }
+//        }
+//
+//        return $this->_session;
+//    }
+//
+//    private $_user = false;
+//
+//    /**
+//     * Gets or sets the authenticated user for this request.
+//     *
+//     * @param Authenticatable $user
+//     * @return \Kerisy\auth\Authenticatable|null
+//     */
+//    public function user($user = null)
+//    {
+//        if ($user !== null) {
+//            $this->_user = $user;
+//            return;
+//        }
+//
+//        if ($this->_user === false) {
+//
+//            if (($session = $this->getSession()) && $session->id) {
+//                $this->_user = auth()->who($session->id);
+//            } else {
+//                $this->_user = null;
+//            }
+//        }
+//
+//        return $this->_user;
+//    }
+//
+//    /**
+//     * Returns the whether the request is a guest request.
+//     *
+//     * @return bool
+//     */
+//    public function guest()
+//    {
+//        return $this->user() === null;
+//    }
 }

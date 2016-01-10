@@ -14,6 +14,7 @@
 
 namespace Kerisy\Auth\Middleware;
 
+use Kerisy;
 use Kerisy\Core\MiddlewareContract;
 use Kerisy\Http\Request;
 
@@ -48,7 +49,7 @@ class BasicAccess implements MiddlewareContract
 
         list($username, $password) = explode(':', base64_decode($parts[1]));
 
-        auth()->attempt([
+        Kerisy::$app->auth->attempt([
             $this->identity => $username,
             'password' => $password,
         ]);

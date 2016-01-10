@@ -1,9 +1,9 @@
 <?php
 /**
  * Kerisy Framework
- *
+ * 
  * PHP Version 7
- *
+ * 
  * @author          Jiaqing Zou <zoujiaqing@gmail.com>
  * @copyright      (c) 2015 putao.com, Inc.
  * @package         kerisy/framework
@@ -13,6 +13,8 @@
  */
 
 namespace Kerisy\Core;
+
+use Kerisy;
 
 /**
  * Class MiddlewareTrait
@@ -36,9 +38,7 @@ trait MiddlewareTrait
         if ($this->_middlewareCalled) {
             throw new InvalidCallException('The middleware stack is already called, no middleware can be added');
         }
-        if (empty($definition)) {
-            return;
-        }
+
         if ($prepend) {
             array_unshift($this->middleware, $definition);
         } else {
@@ -56,9 +56,9 @@ trait MiddlewareTrait
         if ($this->_middlewareCalled) {
             return;
         }
-        
+
         foreach ($this->middleware as $definition) {
-            $middleware = make($definition);
+            $middleware = Kerisy::make($definition);
             if (!$middleware instanceof MiddlewareContract) {
                 throw new InvalidConfigException(sprintf("'%s' is not a valid middleware", get_class($middleware)));
             }

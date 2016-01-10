@@ -1,9 +1,9 @@
 <?php
 /**
  * Kerisy Framework
- *
+ * 
  * PHP Version 7
- *
+ * 
  * @author          Jiaqing Zou <zoujiaqing@gmail.com>
  * @copyright      (c) 2015 putao.com, Inc.
  * @package         kerisy/framework
@@ -41,8 +41,10 @@ class RedisStorage extends Object implements StorageContract
     {
         $this->_redis = new \Redis();
 
-        if (!$this->_redis->connect($this->host, $this->port)) {
+        if (!$this->_redis->pconnect($this->host, $this->port)) {
             throw new InvalidConfigException("The redis host '{$this->host}' error.");
+        } else {
+            $this->_redis->setOption(\Redis::OPT_SERIALIZER, \Redis::SERIALIZER_PHP);
         }
     }
 
@@ -58,7 +60,7 @@ class RedisStorage extends Object implements StorageContract
     {
         if ($data = $this->_redis->get($this->getPrefixKey($id)))
         {
-            return unserialize($data);
+            return $data;
         }
 
         return null;
@@ -69,7 +71,17 @@ class RedisStorage extends Object implements StorageContract
      */
     public function write($id, array $data)
     {
-        return $this->_redis->set($this->getPrefixKey($id), serialize($data), $this->timeout) !== false;
+        return $this->_redis->set($this->getPrefixKey($id), $data, $this->timeout) !== false;
+    }
+
+    /**
+     * Refresh session
+     * @param $id
+     * @return bool|null
+     */
+    public function refresh($id)
+    {
+        return $this->_redis->expireAt($this->getPrefixKey($id), time() + $this->timeout);
     }
 
     /**

@@ -1,9 +1,9 @@
 <?php
 /**
  * Kerisy Framework
- *
+ * 
  * PHP Version 7
- *
+ * 
  * @author          Jiaqing Zou <zoujiaqing@gmail.com>
  * @copyright      (c) 2015 putao.com, Inc.
  * @package         kerisy/framework
@@ -14,62 +14,27 @@
 
 namespace Kerisy\Auth;
 
-use Kerisy\Http\Request;
-use Kerisy\Support\Account;
-
 /**
  * Interface Authenticatable
  *
  * @package Kerisy\Auth
  */
-trait Authenticatable
+interface Authenticatable
 {
-    use Account;
-
-    public function updateToken(Request $request)
-    {
-        return [
-            'uid' => $request->get('uid'),
-            'token' => $request->get('token')
-        ];
-    }
-
-    /**
-     * @auth haoyanfei<haoyf@putao.com>
-     * @param $credentials [token,sign]
-     * @return bool
-     */
-    public function retrieveByToken($credentials = [])
-    {
-        /**account[id,nickname,token]**/
-        if ($this->authorizable($credentials)) {
-            if (!method_exists($this, 'updateUserByAccount')) {
-                return static::findIdentity($credentials['uid']);
-            }
-        }
-        return false;
-    }
-
     /**
      * Find model by it's identifiers.
      *
      * @param mixed $id
      * @return static
      */
-    public static function findIdentity($id)
-    {
-        return static::where('id', $id)->first();
-    }
+    public static function findIdentity($id);
 
     /**
      * Get the auth id that used to store in session.
      *
      * @return mixed
      */
-    public function getAuthId()
-    {
-        return $this->getKey();
-    }
+    public function getAuthId();
 
     /**
      * Check whether the given password is correct.
@@ -77,8 +42,5 @@ trait Authenticatable
      * @param $password
      * @return boolean
      */
-    public function validatePassword($password)
-    {
-        return true;
-    }
+    public function validatePassword($password);
 }

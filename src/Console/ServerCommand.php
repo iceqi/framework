@@ -14,6 +14,7 @@
 
 namespace Kerisy\Console;
 
+use Kerisy;
 use Kerisy\Core\Console\Command;
 use Kerisy\Core\InvalidParamException;
 use Kerisy\Core\InvalidValueException;
@@ -41,7 +42,7 @@ class ServerCommand extends Command
     {
         $operation = $input->getArgument('operation');
 
-        if (!in_array($operation, ['run', 'start', 'restart', 'stop'])) {
+        if (!in_array($operation, ['run', 'start', 'restart', 'stop', 'reload'])) {
             throw new InvalidParamException('The <operation> argument is invalid');
         }
 
@@ -49,46 +50,77 @@ class ServerCommand extends Command
 
     }
 
+    /**
+     * Run Server
+     * @return mixed
+     * @throws Kerisy\Core\InvalidConfigException
+     */
     protected function handleRun()
     {
-        $server = config('service')->all();
+        $server = Kerisy::$app->config('service')->all();
         $server['asDaemon'] = 0;
+        $server['pidFile'] = RUNTIME_PATH . 'server.pid';
 
-        return make($server)->run();
+        return Kerisy::make($server)->run();
     }
 
+    /**
+     * Start Server
+     * @return mixed
+     * @throws Kerisy\Core\InvalidConfigException
+     */
     protected function handleStart()
     {
-        $pidFile = APPLICATION_PATH . 'runtime/server.pid';
+        $pidFile = RUNTIME_PATH . 'server.pid';
 
         if (file_exists($pidFile)) {
             throw new InvalidValueException('The pidfile exists, it seems the server is already started');
         }
 
-        $server = config('service')->all();
+        $server = Kerisy::$app->config('service')->all();
         $server['asDaemon'] = 1;
-        $server['pidFile'] = APPLICATION_PATH . 'runtime/server.pid';
+        $server['pidFile'] =$pidFile;
 
-        return make($server)->run();
+        return Kerisy::make($server)->run();
     }
 
+    /**
+     * Restart Server
+     * @return mixed
+     */
     protected function handleRestart()
     {
         $this->handleStop();
-
         return $this->handleStart();
     }
 
+    /**
+     * Stop Server
+     * @return int
+     */
     protected function handleStop()
     {
-        $pidFile = APPLICATION_PATH . 'runtime/server.pid';
-        if (file_exists($pidFile) && posix_kill(file_get_contents($pidFile), 15)) {
-            do {
-                usleep(100000);
-            } while(file_exists($pidFile));
-            return 0;
+        $pidFile = RUNTIME_PATH . 'server.pid';
+
+        $ret = 1;
+
+        while (file_exists($pidFile) && posix_kill(file_get_contents($pidFile), SIGTERM)) {
+            unlink($pidFile);
+            $ret = 0;
         }
 
+        return $ret;
+    }
+
+    /**
+     * Reload Server
+     */
+    protected function handleReload()
+    {
+        $pidFile = RUNTIME_PATH . 'server.pid';
+        if (file_exists($pidFile) && posix_kill(file_get_contents($pidFile), SIGUSR1)) {
+            return 0;
+        }
         return 1;
     }
 }

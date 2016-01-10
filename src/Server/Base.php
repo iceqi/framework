@@ -14,6 +14,7 @@
 
 namespace Kerisy\Server;
 
+use Kerisy;
 use Kerisy\Core\Object;
 use Kerisy\Core\Application;
 
@@ -52,12 +53,12 @@ abstract class Base extends Object
 
     public function stopApp()
     {
-        app()->shutdown();
+        Kerisy::$app->shutdown();
     }
 
     public function handleRequest($request)
     {
-        return app()->handleRequest($request);
+        return Kerisy::$app->handleRequest($request);
     }
 
     abstract public function run();

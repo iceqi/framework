@@ -1,9 +1,9 @@
 <?php
 /**
  * Kerisy Framework
- *
+ * 
  * PHP Version 7
- *
+ * 
  * @author          Jiaqing Zou <zoujiaqing@gmail.com>
  * @copyright      (c) 2015 putao.com, Inc.
  * @package         kerisy/framework
@@ -14,30 +14,31 @@
 
 namespace Kerisy\Http;
 
-use Kerisy\Core\MiddlewareTrait;
+use Kerisy;
 
 class Controller
 {
-    private $_user_id;
-    
-    use MiddlewareTrait;
+    public function __construct()
+    {
 
-//    public function before()
-//    {
-//    
-//    }
-//    
-//    public function after()
-//    {
-//    
-//    }
-    
-    public function userId()
-    {
-        return $this->_user_id;
     }
-    public function guestActions()
+
+    /**
+     * Renders a view and applies layout if available.
+     *
+     * @param string $template the template name.
+     * @param array $params the parameters (name-value pairs) that should be made available in the view.
+     * These parameters will not be available in the layout.
+     * @return string the rendering result.
+     * @throws InvalidParamException if the view file or the layout file does not exist.
+     */
+    public function render($template, $params = [])
     {
-        return [];
+        $view = Kerisy::$app->getView();
+        $view->setViewPath(Kerisy::$app->route->getPrefix() . '/' . Kerisy::$app->route->getModule());
+        if (!empty($params)) {
+            $view->replace($params);
+        }
+        return $view->render($template);
     }
 }

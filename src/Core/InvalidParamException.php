@@ -20,7 +20,7 @@ namespace Kerisy\Core;
  * @author Qiang Xue <qiang.xue@gmail.com>
  * @since 2.0
  */
-class InvalidParamException extends \BadMethodCallException
+class InvalidParamException extends Exception
 {
     /**
      * @return string the user-friendly name of this exception

@@ -1,9 +1,9 @@
 <?php
 /**
  * Kerisy Framework
- *
+ * 
  * PHP Version 7
- *
+ * 
  * @author          Jiaqing Zou <zoujiaqing@gmail.com>
  * @copyright      (c) 2015 putao.com, Inc.
  * @package         kerisy/framework
@@ -13,6 +13,8 @@
  */
 
 namespace Kerisy\Server;
+
+use Kerisy;
 
 /**
  * A Swoole based server implementation.
@@ -50,6 +52,10 @@ class Swoole extends Base
      */
     public $logFile;
 
+    /**
+     * @var \swoole_http_server
+     */
+    private $_server;
 
     private function normalizedConfig()
     {
@@ -110,19 +116,35 @@ class Swoole extends Base
     }
 
 
+    /**
+     * Master Process Start
+     * @param \swoole_http_server $server
+     */
     public function onServerStart($server)
     {
-        cli_set_process_title($this->name . ': master');
+        if (PHP_OS != 'Darwin') {
+            cli_set_process_title($this->name . ': master');
+        }
+
         if ($this->pidFile) {
             file_put_contents($this->pidFile, $server->master_pid);
         }
     }
 
+    /**
+     * Manager Process Start
+     * @param \swoole_http_server $server
+     */
     public function onManagerStart($server)
     {
-        cli_set_process_title($this->name . ': manager');
+        if (PHP_OS != 'Darwin') {
+            cli_set_process_title($this->name . ': manager');
+        }
     }
 
+    /**
+     * Master Process Stop
+     */
     public function onServerStop()
     {
         if ($this->pidFile) {
@@ -130,9 +152,16 @@ class Swoole extends Base
         }
     }
 
-    public function onWorkerStart()
+    /**
+     * Worker Process Start
+     * @param \swoole_http_server $server
+     * @param int $worker_id
+     */
+    public function onWorkerStart($server, $worker_id)
     {
-        cli_set_process_title($this->name . ': worker');
+        if (PHP_OS != 'Darwin') {
+            cli_set_process_title($this->name . ': worker');
+        }
         $this->startApp();
     }
 
@@ -151,52 +180,95 @@ class Swoole extends Base
 
     }
 
+    /**
+     * Prepare Request
+     * @param \swoole_http_request $request
+     * @return mixed
+     */
     protected function prepareRequest($request)
     {
-        $port = 80;
-        $hosts = explode(':', $request->header['host']);
+        //list($host, $port) = explode(':', $request->header['host']);
 
-        if (count($hosts) > 1) {
-            $port = $hosts[1];
-        }
-        $host = $hosts[0];
+        $get = isset($request->get) ? $request->get : [];
+        $post = isset($request->post) ? $request->post : [];
+        $cookies = isset($request->cookie) ? $request->cookie : [];
+        $files = isset($request->files) ? $request->files : [];
+
         $config = [
             'protocol' => $request->server['server_protocol'],
-            'host' => $host,
-            'port' => $port,
+            'host' => $request->header['host'],
+            'port' => 80,
             'method' => $request->server['request_method'],
             'path' => $request->server['request_uri'],
             'headers' => $request->header,
-            'params' => isset($request->get) ? $request->get : [],
-            'content' => $request->rawcontent()
+            'cookies' => $cookies,
+            'params' => array_merge($get, $post),
+            'content' => $request->rawcontent(),
+            'files' => $files
         ];
-        if (isset($request->files) && is_array($request->files)) {
-            $config['files'] = $request->files;
-        }
-        return app()->makeRequest($config);
+
+        return Kerisy::$app->makeRequest($config);
     }
 
+    /**
+     * 监听request
+     * @param \swoole_http_request $request
+     * @param \swoole_http_response $response
+     */
     public function onRequest($request, $response)
     {
+        if (XHPROF_OPEN && function_exists("xhprof_enable")) {
+            xhprof_enable(XHPROF_FLAGS_CPU + XHPROF_FLAGS_MEMORY);
+        }
+
+        /**
+         * @var \Kerisy\Http\Response
+         */
         $res = $this->handleRequest($this->prepareRequest($request));
 
         $content = $res->content();
 
         foreach ($res->headers->all() as $name => $values) {
             $name = str_replace(' ', '-', ucwords(str_replace('-', ' ', $name)));
-            foreach ($values as $value) {
+            foreach($values as $value) {
                 $response->header($name, $value);
             }
         }
-        $response->header('Content-Length', strlen($content));
 
+        //设置cookie
+        foreach ($res->cookies->all() as $name => $cookie) {
+            $response->cookie($cookie->name, $cookie->value, $cookie->expire, $cookie->path,
+                                $cookie->domain, $cookie->secure, $cookie->httpOnly);
+        }
+
+        if (XHPROF_OPEN && function_exists("xhprof_enable")) {
+            static $xhprof_runs = null;
+            if (!$xhprof_runs) {
+                include(APPLICATION_PATH . "libraries/Util/xhprof_lib/utils/xhprof_lib.php");
+                include(APPLICATION_PATH . "libraries/Util/xhprof_lib/utils/xhprof_runs.php");
+                $xhprof_runs = new \XHProfRuns_Default();
+            }
+
+            $xhprof_data = xhprof_disable();
+            //记录执行超过200毫秒的请求, xhprof 时间单位是 微秒
+            if ($xhprof_data['main()']['wt'] / 1000000 > 0.2) {
+                $run_id = $xhprof_runs->save_run($xhprof_data, "kids2_swoole");
+                //echo $run_id . PHP_EOL;
+            }
+        }
+
+        //$response->gzip(1);
+        //$response->header('Content-Length', strlen($content));
         $response->status($res->statusCode);
         $response->end($content);
     }
 
     public function run()
     {
-        $server = $this->createServer();
-        $server->start();
+        $this->_server = $this->createServer();
+
+        Kerisy::$app->server = $this->_server;
+
+        $this->_server->start();
     }
 }

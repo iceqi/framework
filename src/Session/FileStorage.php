@@ -72,6 +72,16 @@ class FileStorage extends Object implements StorageContract
     }
 
     /**
+     * Refresh session
+     * @param $id
+     * @return bool|null
+     */
+    public function refresh($id)
+    {
+        return null;
+    }
+
+    /**
      * @inheritDoc
      */
     public function timeout($timeout)

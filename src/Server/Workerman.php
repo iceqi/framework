@@ -21,5 +21,8 @@ namespace Kerisy\Server;
  */
 class Workerman extends Base
 {
-    
+    public function run()
+    {
+        // TODO: Implement run() method.
+    }
 }

@@ -1,9 +1,9 @@
 <?php
 /**
  * Kerisy Framework
- *
+ * 
  * PHP Version 7
- *
+ * 
  * @author          Jiaqing Zou <zoujiaqing@gmail.com>
  * @copyright      (c) 2015 putao.com, Inc.
  * @package         kerisy/framework
@@ -14,10 +14,10 @@
 
 namespace Kerisy\Http;
 
-use Kerisy\Core\MiddlewareTrait;
 use Kerisy\Core\Object;
+use Kerisy\Core\MiddlewareTrait;
 use Kerisy\Core\ShouldBeRefreshed;
-use Kerisy\Support\Json;
+use Kerisy\Core\InvalidCallException;
 use Kerisy\Core\InvalidParamException;
 
 /**
@@ -36,12 +36,24 @@ class Response extends Object implements ShouldBeRefreshed
      */
     public $headers;
 
+    /**
+     * @var CookieBag
+     */
+    public $cookies;
+
+    public $content;
+
+    public $sessionId = null;
+
     public $version = '1.0';
+    public $charset = 'UTF-8';
 
     public $statusCode = 200;
     public $statusText;
 
-    public $prefix;
+    /**
+     * @var View
+     */
     public $view;
 
     public static $httpStatuses = [
@@ -112,84 +124,42 @@ class Response extends Object implements ShouldBeRefreshed
         511 => 'Network Authentication Required',
     ];
 
-    protected $content;
+    const FORMAT_RAW = 'raw';
+    const FORMAT_HTML = 'html';
+    const FORMAT_JSON = 'json';
+    const FORMAT_JSONP = 'jsonp';
+    const FORMAT_XML = 'xml';
+
+    protected $format = self::FORMAT_HTML;
+    protected $formatters = [];
+
     protected $prepared = false;
 
     public function init()
     {
         $this->headers = new HeaderBag();
+        $this->cookies = new CookieBag();
+        $this->formatters = $this->defaultFormatters();
     }
 
-    public function setPrefix($prefix)
+    public function getFormat()
     {
-        $this->prefix = $prefix;
+        return $this->format;
     }
 
-    public function initView()
+    public function setFormat($format)
     {
-        if (!$this->view) {
-            $this->view = new \Kerisy\Http\View($this->prefix);
-        }
-    }
-
-    public function view($template, $data = [])
-    {
-        $this->initView();
-
-        $this->view->replace($data);
-        $this->data = $this->view->render($template);
-
-        $this->headers->set('Content-Type', 'text/html');
-
-        return $this;
-    }
-
-
-    public function json($data = [])
-    {
-        $this->data = json_encode($data, JSON_UNESCAPED_UNICODE);
-
-        $this->headers->set('Content-Type', 'application/json');
-
-        return $this;
+        $this->format = $format;
     }
 
     /**
-     * @describe 跳转
-     * @auth haoyanfei<haoyf@putao.com>
-     * @param $url
-     * @param int $code
-     * @param string $text
-     * @return $this
+     * 设置Cookie
+     * @param Cookie $cookie
      */
-    public function redirect($url, $code = 302, $text = '')
+    public function setCookie(Cookie $cookie)
     {
-        if (empty($url)) {
-            throw new \InvalidArgumentException('Cannot redirect to an empty URL.');
-        }
-        $this->data =
-            sprintf('<!DOCTYPE html>
-<html>
-    <head>
-        <meta charset="UTF-8" />
-        <meta http-equiv="refresh" content="1;url=%1$s" />
-        <title>Redirecting to %1$s</title>
-    </head>
-    <body>
-        Redirecting to <a href="%1$s">%1$s</a>.
-    </body>
-</html>', htmlspecialchars($url, ENT_QUOTES, 'UTF-8'));
-        $this->headers->set('Location', $url);
-        $this->status($code, $text);
-        return $this;
+        $this->cookies->add([$cookie->name => $cookie]);
     }
-
-    public function download($filepath, $name, $headers)
-    {
-        // TODO
-        return $this;
-    }
-
 
     public function status($code, $text = null)
     {
@@ -218,10 +188,34 @@ class Response extends Object implements ShouldBeRefreshed
     public function prepare()
     {
         if (!$this->prepared) {
-            $this->content = is_string($this->data) ? $this->data : Json::encode($this->data);
-            if (!is_string($this->data)) {
-                $this->headers->set('Content-Type', 'application/json');
+            if (isset($this->formatters[$this->format])) {
+                $formatter = $this->formatters[$this->format];
+                if (!is_object($formatter)) {
+                    $this->formatters[$this->format] = $formatter = \Kerisy::make($formatter);
+                }
+
+                if ($formatter instanceof ResponseFormatterInterface) {
+                    $formatter->format($this);
+                } else {
+                    throw new InvalidCallException("The '{$this->format}' response formatter is invalid. It must implement the ResponseFormatterInterface.");
+                }
+            } elseif ($this->format === self::FORMAT_RAW) {
+                $this->content = $this->data;
+            } else {
+                throw new InvalidConfigException("Unsupported response format: {$this->format}");
             }
+
+            if (is_array($this->content)) {
+                $this->headers->set('Content-Type', 'application/json; charset=UTF-8');
+                $this->content = json_encode($this->content, JSON_UNESCAPED_UNICODE);
+            } elseif (is_object($this->content)) {
+                if (method_exists($this->content, '__toString')) {
+                    $this->content = $this->content->__toString();
+                } else {
+                    throw new InvalidParamException("Response content must be a string or an object implementing __toString().");
+                }
+            }
+
             $this->prepared = true;
         }
     }
@@ -240,5 +234,23 @@ class Response extends Object implements ShouldBeRefreshed
         return $this->content;
     }
 
+    public function setSessionId($sessionId = null)
+    {
+        $this->sessionId = $sessionId ? $sessionId : md5(microtime(true) . uniqid('', true) . uniqid('', true));
+    }
 
+    /**
+     * @return array the formatters that are supported by default
+     */
+    protected function defaultFormatters()
+    {
+        return [
+            self::FORMAT_HTML => 'Kerisy\Http\HtmlResponseFormatter',
+            self::FORMAT_JSON => 'Kerisy\Http\JsonResponseFormatter',
+            self::FORMAT_JSONP => [
+                'class' => 'Kerisy\Http\JsonResponseFormatter',
+                'useJsonp' => true,
+            ],
+        ];
+    }
 }

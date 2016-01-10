@@ -1,9 +1,9 @@
 <?php
 /**
  * Kerisy Framework
- * 
+ *
  * PHP Version 7
- * 
+ *
  * @author          Jiaqing Zou <zoujiaqing@gmail.com>
  * @copyright      (c) 2015 putao.com, Inc.
  * @package         kerisy/framework
@@ -31,14 +31,17 @@ class MemcacheStorage extends Object implements StorageContract
 
     protected $timeout = 3600;
 
+    /**
+     * @var \Memcache
+     */
     private $_memcache;
 
     public function init()
     {
         $this->_memcache = new \Memcache();
 
-        if (!$this->_memcache->connect($this->host, $this->port)) {
-            throw new InvalidConfigException("The memcached host '{$this->host}' error.");
+        if (!$this->_memcache->addserver($this->host, $this->port, true)) {
+            throw new InvalidConfigException("The memcached host '{$this->host}' has went away.");
         }
     }
 
@@ -52,9 +55,8 @@ class MemcacheStorage extends Object implements StorageContract
      */
     public function read($id)
     {
-        if ($data = $this->_memcache->get($this->getPrefixKey($id)))
-        {
-            return unserialize($data);
+        if ($data = $this->_memcache->set($this->getPrefixKey($id))) {
+            return $data;
         }
 
         return null;
@@ -65,7 +67,20 @@ class MemcacheStorage extends Object implements StorageContract
      */
     public function write($id, array $data)
     {
-        return $this->_memcache->set($this->getPrefixKey($id), serialize($data), 0, $this->timeout) !== false;
+        return $this->_memcache->set($this->getPrefixKey($id), $data, 0, $this->timeout) !== false;
+    }
+
+    /**
+     * Refresh session
+     * @param $id
+     * @return bool|null
+     */
+    public function refresh($id)
+    {
+        if ($data = $this->read($id)) {
+            return $this->write($id, $data);
+        }
+        return null;
     }
 
     /**
@@ -86,4 +101,5 @@ class MemcacheStorage extends Object implements StorageContract
     {
         $this->timeout = $timeout;
     }
+
 }

@@ -14,6 +14,7 @@
 
 namespace Kerisy\Core;
 
+use Kerisy;
 use Psr\Log\LogLevel;
 
 /**
@@ -40,7 +41,7 @@ class ErrorHandler extends Object
     public function init()
     {
         if (!$this->logger) {
-            $this->logger = service('log');
+            $this->logger = Kerisy::$app->getService('log');
         }
 
         $this->register();

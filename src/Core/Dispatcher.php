@@ -25,6 +25,9 @@ use Kerisy\Http\Request;
  */
 class Dispatcher extends Object
 {
+    /**
+     * @var Router
+     */
     protected $_router;
 
     public function init()

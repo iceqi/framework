@@ -1,9 +1,9 @@
 <?php
 /**
  * Kerisy Framework
- *
+ * 
  * PHP Version 7
- *
+ * 
  * @author          Jiaqing Zou <zoujiaqing@gmail.com>
  * @copyright      (c) 2015 putao.com, Inc.
  * @package         kerisy/framework
@@ -15,46 +15,45 @@
 namespace Kerisy\Http;
 
 use Kerisy\Core\Set;
-use Symfony\Component\Translation\Exception\InvalidResourceException;
+use Kerisy\Core\Exception;
 
 class View extends Set
 {
-    protected $_ext = '.phtml';
-    protected $_template_dir;
+    protected $_ext = '.php';
+    protected $_template_dir = '';
     protected $_prefix;
 
-    public function __construct($prefix = 'front')
+    public function __construct()
     {
-        $this->_template_dir = APPLICATION_PATH . 'views/' . strtolower($prefix) . '/';
+        $this->_template_dir = APPLICATION_PATH . 'views';
+        parent::__construct();
+    }
+
+    public function setViewPath($path)
+    {
+        $this->_template_dir = APPLICATION_PATH . 'views/' . strtolower($path) . '/';
         if (!is_dir($this->_template_dir))
         {
-            throw new InvalidResourceException('Template directory does not exist: ' . $this->_template_dir);
+            throw new Exception('Template directory does not exist: ' . $this->_template_dir);
         }
     }
-
-    private function getTemplateFile($template)
-    {
-        $template_file = $this->_template_dir . $template .$this->_ext;
-
-        if(!file_exists($template_file)){
-            throw new InvalidResourceException('Template file does not exist: ' . $template_file);
-        }
-
-        return $template_file;
-    }
-
-    private function template($template)
-    {
-
-        include $this->getTemplateFile($template);
-    }
-
+    
     public function render($template)
     {
-        ob_start(null, 0, false);
+        $template_file = $this->_template_dir . $template . $this->_ext;
+        if (!file_exists($template_file))
+        {
+            throw new Exception('Template file does not exist: ' . $template_file);
+        }
+        
+        ob_start();
 
-        include $this->getTemplateFile($template);
+        ob_implicit_flush(0);
 
-        return ob_get_contents();
+        extract($this->data, EXTR_OVERWRITE);
+
+        include($template_file);
+        
+        return ob_get_clean();
     }
 }

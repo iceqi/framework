@@ -36,12 +36,6 @@ class RouteGroup extends Object
         return $this->_prefix;
     }
 
-    /**
-     * 类似下面这种形式的配置文件
-    ['route' => '/', 'module'=> 'core', 'controller' => 'index', 'action' => 'index'],
-    ['route' => 'user/<id:\d+>/', 'module'=> 'user', 'controller' => 'user', 'action' => 'show', 'params' => ['param1'=>'p1', 'param2'=>'p2']],
-    ['route' => 'product/list', 'module'=> 'product', 'controller' => 'product', 'action' => 'index', 'params' => ['param1'=>'p1', 'param2'=>'p2']]
-     */
     public function addRoute($config = [])
     {
         if (count($config) < 3)
@@ -88,7 +82,7 @@ class RouteGroup extends Object
             $routeObject->setPattern($pattern);
             $routeObject->setTemplate($template);
             $routeObject->setRegular(true);
-            $routeObject->setParamKeys($params);
+            $routeObject->setParams($params);
         }
 
         $this->_routes[$pattern] = $routeObject;
@@ -107,10 +101,9 @@ class RouteGroup extends Object
 
             if (preg_match($route->getPattern(), $path, $maches)) {
                 $params = [];
-                foreach ($route->getParamKeys() as $i => $key) {
+                foreach ($route->getParams() as $i => $key) {
                     $params[$key] = $maches[$i + 1];
                 }
-                $route->setParams($params);
                 return $route;
             }
         }

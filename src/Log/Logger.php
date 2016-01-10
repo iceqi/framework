@@ -14,10 +14,9 @@
 
 namespace Kerisy\Log;
 
+use Kerisy;
 use Kerisy\Core\InvalidParamException;
 use Kerisy\Core\Object;
-use Kerisy\Di\Instance;
-use Monolog\Formatter\JsonFormatter;
 use Psr\Log\LoggerInterface;
 use Psr\Log\LoggerTrait;
 use Monolog\Logger as BaseMonoLogger;
@@ -35,6 +34,9 @@ class Logger extends Object implements LoggerInterface
     public $name = 'kerisy';
     public $targets = [];
 
+    /**
+     * @var \Monolog\Logger
+     */
     protected $monolog;
 
     protected $levelMap = [
@@ -53,17 +55,17 @@ class Logger extends Object implements LoggerInterface
         $this->monolog = new MonoLogger($this->name);
 
         foreach ($this->targets as &$target) {
-            $target = make($target);
+            $target = Kerisy::make($target);
             $this->monolog->pushHandler($target);
         }
     }
 
     /**
      * Logs with an arbitrary level.
-     *
      * @param mixed $level
      * @param string $message
      * @param array $context
+     * @throws InvalidParamException
      * @return null
      */
     public function log($level, $message, array $context = [])

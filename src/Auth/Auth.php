@@ -1,9 +1,9 @@
 <?php
 /**
  * Kerisy Framework
- *
+ * 
  * PHP Version 7
- *
+ * 
  * @author          Jiaqing Zou <zoujiaqing@gmail.com>
  * @copyright      (c) 2015 putao.com, Inc.
  * @package         kerisy/framework
@@ -14,10 +14,8 @@
 
 namespace Kerisy\Auth;
 
-use App\User\Model\User;
 use Kerisy\Core\Object;
 use Kerisy\Auth\Contract as AuthContract;
-use Kerisy\Contracts\Auth\Authenticatable;
 
 /**
  * Class Auth
@@ -29,7 +27,7 @@ class Auth extends Object implements AuthContract
     /**
      * The class that implements Authenticatable interface.
      *
-     * @var \Kerisy\Contracts\Auth\Authenticatable
+     * @var \Kerisy\auth\Authenticatable
      */
     public $model;
 
@@ -40,8 +38,12 @@ class Auth extends Object implements AuthContract
     {
         $class = $this->model;
 
-        $user = $class::findIdentity($credentials['uid']);
-        return $user && $user->retrieveByToken($credentials) ? $user : false;
+        $password = isset($credentials['password']) ? $credentials['password'] : null;
+        unset($credentials['password']);
+
+        $user = $class::findIdentity($credentials);
+
+        return $user && $user->validatePassword($password) ? $user : false;
     }
 
     /**
@@ -76,12 +78,12 @@ class Auth extends Object implements AuthContract
     public function login(Authenticatable $user, $once = false)
     {
         $request = request();
-        $token = $request->get('token');
+
         if (!$once) {
-//            $session = session()->put($user->updateToken($request));
-            session()->set($token, $user->updateToken($request));
-            $request->session = $user;
+            $session = session()->put(['auth_id' => $user->getAuthId()]);
+            $request->session = $session;
         }
+
         $request->user($user);
     }
 
@@ -101,13 +103,7 @@ class Auth extends Object implements AuthContract
         $class = $this->model;
 
         if ($bag = session()->get($sessionId)) {
-            return $class::findIdentity($bag['uid']);
+            return $class::findIdentity($bag->get('auth_id'));
         }
-    }
-
-    public function check()
-    {
-        $obj = $this->who(request()->get('token'));
-        return !is_null($obj) && ($obj instanceof User);
     }
 }
