@@ -9,7 +9,7 @@ namespace Kerisy\DB;
 
 use PDO;
 use Kerisy;
-use Kerisy\Core\Component;
+use Kerisy\Core\Object;
 use Kerisy\Core\InvalidConfigException;
 use Kerisy\Core\NotSupportedException;
 
@@ -129,7 +129,7 @@ use Kerisy\Core\NotSupportedException;
  * @author Qiang Xue <qiang.xue@gmail.com>
  * @since 2.0
  */
-class Connection
+class Connection extends Object /*implements Kerisy\Core\ShouldBeRefreshed*/
 {
     /**
      * @event Event an event that is triggered after a DB connection is established
@@ -522,7 +522,6 @@ class Connection
             throw new InvalidConfigException('Connection::dsn cannot be empty.');
         }
 
-        $token = 'Opening DB connection: ' . $this->dsn;
         try {
             $this->pdo = $this->createPdoInstance();
             $this->initConnection();

@@ -47,7 +47,6 @@ class ServerCommand extends Command
         }
 
         return call_user_func([$this, 'handle' . $operation]);
-
     }
 
     /**

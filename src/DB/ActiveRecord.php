@@ -413,10 +413,11 @@ class ActiveRecord extends BaseActiveRecord
      */
     public function insert($runValidation = true, $attributes = null)
     {
+        /*
         if ($runValidation && !$this->validate($attributes)) {
-            Yii::info('Model not inserted due to validation error.', __METHOD__);
             return false;
         }
+        */
 
         if (!$this->isTransactional(self::OP_INSERT)) {
             return $this->insertInternal($attributes);

@@ -761,7 +761,7 @@ class Command extends Object
         $rawSql = $this->getRawSql();
 
         if (KERISY_ENV == 'development') {
-            echo $rawSql . PHP_EOL;
+            $startTime = microtime(true);
         }
 
         if ($sql == '') {
@@ -784,6 +784,11 @@ class Command extends Object
             SimpleLog::log('db_error', $rawSql);
 
             throw $this->db->getSchema()->convertException($e, $rawSql);
+        } finally {
+            if (KERISY_ENV == 'development') {
+                $endTime = microtime(true);
+                echo $rawSql . '|' . ($endTime - $startTime) . PHP_EOL;
+            }
         }
     }
 
@@ -801,7 +806,7 @@ class Command extends Object
         $rawSql = $this->getRawSql();
 
         if (KERISY_ENV == 'development') {
-            echo 'queryInternal:' . $rawSql . PHP_EOL;
+            $startTime = microtime(true);
         }
 
         if ($method !== '') {
@@ -845,9 +850,14 @@ class Command extends Object
             }
 
             //记录log
-            SimpleLog::log('db_error', $rawSql);
+            SimpleLog::log('db_error', [$rawSql, $e->getMessage()]);
 
             throw $this->db->getSchema()->convertException($e, $rawSql);
+        } finally {
+            if (KERISY_ENV == 'development') {
+                $endTime = microtime(true);
+                echo 'Internal|' . $rawSql . '|' . round($endTime - $startTime, 5) . PHP_EOL;
+            }
         }
 
         if (isset($cache, $cacheKey, $info)) {

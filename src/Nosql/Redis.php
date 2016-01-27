@@ -12,6 +12,7 @@
 namespace Kerisy\Nosql;
 
 use Kerisy\Core\Object;
+use Lib\Util\SimpleLog;
 
 class Redis extends Object
 {
@@ -44,6 +45,7 @@ class Redis extends Object
                 $this->redis->ping();
             } catch (\RedisException $e) {
                 $this->redis = null;
+                SimpleLog::log('redis_error', $e->getMessage());
                 throw new \RedisException();
             }
         }

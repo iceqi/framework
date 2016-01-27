@@ -106,7 +106,7 @@ class Application extends ServiceLocator
     protected $refreshing = [];
 
     private $_configs;
-    
+
     public function __construct() {
         Kerisy::$app = $this;
         parent::__construct($this->config('application')->all());
@@ -134,6 +134,17 @@ class Application extends ServiceLocator
             $this->bootstrapped = true;
 
             $this->get('log')->info('application started');
+        }
+
+        return $this;
+    }
+
+    public function bootstrapConsole()
+    {
+        if (!$this->bootstrapped) {
+            $this->initializeConfig();
+            $this->registerComponents();
+            $this->bootstrapped = true;
         }
 
         return $this;
@@ -252,7 +263,7 @@ class Application extends ServiceLocator
          */
         $route = $this->dispatch($request);
 
-        //$this->route = $route;
+        $this->route = $route;
 
         $action = $this->createAction($route);
 
@@ -265,12 +276,6 @@ class Application extends ServiceLocator
 
         $request->callMiddleware();
         
-        //$response->initView($route->getPrefix());
-        //var_dump($route->getModule());
-        //var_dump($route->getController());
-        //var_dump($route->getAction());
-        //var_dump($route->getPrefix());
-        //var_dump($route->getParams());
         $result = $this->runAction($action, $request, $response);
 
         if (!$result instanceof Response && $result != null) {
@@ -296,6 +301,7 @@ class Application extends ServiceLocator
         ]);
 
         $commands = array_merge($this->commands, [
+            'Kerisy\Console\ConsoleCommand',
             'Kerisy\Console\ServerCommand',
         ]);
 
